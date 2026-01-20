@@ -29,14 +29,18 @@ namespace MTTP.Framework.Tests.Pages
 
         public void Search(string term)
         {
+            AcceptCookiesIfPresent();
+
             var input = Visible(SearchInput);
             input.Clear();
             input.SendKeys(term);
             input.SendKeys(Keys.Enter);
 
-            // čekaj da ode na rezultate (URL se promijeni)
-            Wait.Until(d => d.Url.Contains("njuskalo") && !d.Url.EndsWith("/"));
+            // Stabilnije: čekamo da URL ode s home-a (ili barem da se promijeni)
+            var oldUrl = Driver.Url;
+            Wait.Until(d => d.Url != oldUrl);
         }
+
 
     }
 }

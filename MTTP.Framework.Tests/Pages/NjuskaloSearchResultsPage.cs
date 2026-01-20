@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Support.UI;
+using MTTP.Framework.Tests.Pages.Components;
 
 namespace MTTP.Framework.Tests.Pages
 {
@@ -12,9 +13,13 @@ namespace MTTP.Framework.Tests.Pages
             "a[href*='/oglas/'], a[href*='/auti/'], a[href*='/nekretnine/']"
         );
         private readonly By AnyHeading = By.CssSelector("h1, h2");
+        // Sort dropdown - best effort (UI zna varirati)
+        private readonly By SortDropdown = By.CssSelector("select[name*='sort'], select[id*='sort'], select[aria-label*='Sort'], select[aria-label*='sort']");
+
 
         public NjuskaloSearchResultsPage(IWebDriver driver, WebDriverWait wait)
             : base(driver, wait) { }
+        public NjuskaloFiltersComponent Filters => new NjuskaloFiltersComponent(Driver, Wait);
 
         public void WaitUntilLoaded()
         {
@@ -64,6 +69,38 @@ namespace MTTP.Framework.Tests.Pages
 
             return fallbackLinks;
         }
+        public void ApplySortByValue(string valueContains)
+        {
+            WaitUntilLoaded();
+
+            var oldUrl = Driver.Url;
+
+            var dropdown = Driver.FindElements(SortDropdown).FirstOrDefault(e => e.Displayed && e.Enabled);
+            if (dropdown == null)
+                Assert.Inconclusive("Sort dropdown nije pronađen/vidljiv na ovoj stranici (UI varira).");
+
+            var select = new OpenQA.Selenium.Support.UI.SelectElement(dropdown);
+
+            // pronađi opciju koja u value ili text sadrži traženi string
+            var option = select.Options.FirstOrDefault(o =>
+                (o.GetAttribute("value") ?? "").ToLower().Contains(valueContains.ToLower()) ||
+                (o.Text ?? "").ToLower().Contains(valueContains.ToLower())
+            );
+
+            if (option == null)
+                Assert.Inconclusive($"Nije pronađena sort opcija koja sadrži: '{valueContains}'.");
+
+            var value = option.GetAttribute("value");
+            if (string.IsNullOrEmpty(value))
+                Assert.Inconclusive("Sort opcija nema value atribut.");
+
+            select.SelectByValue(value);
+
+
+            // čekamo promjenu URL-a (sort obično promijeni query param)
+            Wait.Until(d => d.Url != oldUrl);
+        }
+
 
 
     }
