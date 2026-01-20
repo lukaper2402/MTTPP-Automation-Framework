@@ -9,38 +9,59 @@ on:
 
 jobs:
   api-tests:
-    name: Build & Run API tests (stable)
+    name: API tests (.NET 8)
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 8
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
+      - name: Restore
+        run: dotnet restore
+
+      - name: Test API (trx)
+        run: dotnet test MTTP.Framework.ApiTests --configuration Release --logger "trx;LogFileName=api-tests.trx"
+
+      - name: Upload API test results
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
+          name: api-test-results
+          path: |
+            **/TestResults/*.trx
+
+  ui-tests:
+    name: UI tests (Selenium Chrome)
+    runs-on: windows-latest
+    needs: api-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
 
       - name: Restore
         run: dotnet restore
 
-      - name: Build (Release)
-        run: dotnet build --no-restore -c Release
+      - name: Run Smoke UI (fast)
+        run: dotnet test MTTP.Framework.Tests --configuration Release --filter TestCategory=Smoke --logger "trx;LogFileName=ui-smoke.trx"
 
-      - name: Test - API
-        run: dotnet test MTTP.Framework.ApiTests --no-build -c Release --logger "trx;LogFileName=api-tests.trx"
+      - name: Run Regression UI (without external login)
+        run: dotnet test MTTP.Framework.Tests --configuration Release --filter TestCategory=Regression --logger "trx;LogFileName=ui-regression.trx"
+        env:
+          RUN_NJUSKALO_LOGIN: "false"
 
-      - name: Upload test results (TRX)
-        if: always()
+      - name: Upload UI test results
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: test-results-trx
-          path: "**/*.trx"
+          name: ui-test-results
+          path: |
+            **/TestResults/*.trx
